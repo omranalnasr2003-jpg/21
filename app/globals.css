@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:wght@300;400;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0f1923;
+  --surface:  #1a2535;
+  --surface2: #212f42;
+  --border:   #2a3d55;
+  --borderHi: #3a5270;
+  --gold:     #d4a843;
+  --goldLt:   #f0c96a;
+  --goldDim:  #8a6820;
+  --green:    #1e8a5e;
+  --greenLt:  #28c47e;
+  --blue:     #1e5aaa;
+  --blueLt:   #5a9ae0;
+  --text:     #ddeeff;
+  --textSub:  #8aaccc;
+  --textMuted:#4a6580;
+}
+
+html, body { height: 100%; background: var(--bg); }
+body { font-family: 'Crimson Pro', Palatino, serif; color: var(--text); }
+input, button { font-family: inherit; }
+
+@keyframes cardLand {
+  0%   { transform: scale(1.05) translateY(-5px); opacity:.75; }
+  60%  { transform: scale(.99)  translateY(1px); }
+  100% { transform: scale(1)    translateY(0);   opacity:1; }
+}
+@keyframes glowPulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(40,196,126,.25), 0 4px 16px rgba(0,0,0,.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(40,196,126,.5),  0 6px 22px rgba(0,0,0,.6); }
+}
+@keyframes collectCard {
+  0%   { opacity:1; transform:scale(1) translateY(0); }
+  100% { opacity:0; transform:scale(.3) translateY(-20px); }
+}
+@keyframes fadeInUp {
+  from { opacity:0; transform:translateY(5px); }
+  to   { opacity:1; transform:none; }
+}
+@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:none} }
+@keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes spin    { to{transform:rotate(360deg)} }
+
+/* will-change isolates GPU layers — no layout shifts */
+.card-new     { animation: fadeInUp .22s ease-out; will-change: opacity, transform; }
+.card-land    { animation: cardLand .22s ease-out; will-change: opacity, transform; }
+.card-glow    { animation: glowPulse .7s ease-in-out infinite; will-change: box-shadow; }
+.card-collect { animation: collectCard .35s ease-in forwards; will-change: opacity, transform; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
