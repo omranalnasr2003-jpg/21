@@ -347,9 +347,6 @@ function MoveLog({ log, playerNames }) {
   )
 }
 
-function Tag({ children, color=C.gold }) {
-  return <span style={{ background:`${color}22`, border:`1px solid ${color}55`, color, borderRadius:5, padding:'1px 6px', fontSize:10, letterSpacing:1, fontFamily:"'Cinzel',serif" }}>{children}</span>
-}
 
 // ─── GAME ─────────────────────────────────────────────────────────────────────
 function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
