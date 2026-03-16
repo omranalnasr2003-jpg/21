@@ -709,17 +709,23 @@ export default function Home() {
   const handleJoinGame = async (name, code, setError) => {
     const { data, error } = await supabase.from('rooms').select('*').eq('code',code).single()
     if (error||!data) { setError('Raum nicht gefunden.'); return }
-    // Spectator if game already running or room full
     const existing = data.player_names || []
-    if (data.status==='playing' || existing.length>=data.max_players) {
+    // Spectator ONLY if game is already playing AND room is full
+    if (data.status==='playing' && existing.length >= data.max_players) {
       setRoomCode(code); setRoomId(data.id); setMyIdx(-1); setIsHost(false); setIsSpectator(true)
       setGs(data.game_state); subscribeRoom(data.id); setScreen('game'); return
     }
+    // Room full but not started
+    if (existing.length >= data.max_players) {
+      setError('Raum ist bereits voll.'); return
+    }
+    // Normal join
     const newNames = [...existing, name]
     const idx = newNames.length - 1
     const updates = { player_names:newNames }
     if (newNames.length >= data.max_players) updates.status = 'ready'
-    await supabase.from('rooms').update(updates).eq('id',data.id)
+    const { error: err2 } = await supabase.from('rooms').update(updates).eq('id', data.id)
+    if (err2) { setError('Fehler beim Beitreten.'); return }
     setRoomCode(code); setRoomId(data.id); setMyIdx(idx); setIsHost(false); setIsSpectator(false)
     setGs(data.game_state); subscribeRoom(data.id); setScreen('waiting')
   }
