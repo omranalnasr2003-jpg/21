@@ -488,12 +488,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
         </div>
       </div>
 
-      {/* Spectator banner */}
-      {isSpectator && (
-        <div style={{ width:'100%', maxWidth:560, marginBottom:8, padding:'8px 16px', borderRadius:10, background:`rgba(90,154,224,.12)`, border:`1px solid rgba(90,154,224,.3)`, textAlign:'center', color:C.blueLt, fontSize:13 }}>
-          👁 Du schaust zu (Zuschauer-Modus)
-        </div>
-      )}
+
 
       {/* Opponents */}
       {playerNames.slice(1).map((name,oi) => {
@@ -559,7 +554,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
             {teamMode&&n===4 && <Tag color={myIdx%2===0?C.gold:C.blueLt}>{`Team ${myIdx%2===0?'A':'B'}`}</Tag>}
           </div>
           <span style={{ color:isMyTurn?C.greenLt:comboMenu?C.gold:C.textMuted, fontSize:11 }}>
-            {isSpectator ? '👁 Zuschauer' : isMyTurn ? (drag?'Auf Tisch ziehen…':'Dein Zug') : comboMenu?'Kombination wählen ↓':'Warten…'}
+            {isMyTurn ? (drag?'Auf Tisch ziehen…':'Dein Zug') : comboMenu?'Kombination wählen ↓':'Warten…'}
           </span>
         </div>
         <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
@@ -710,16 +705,7 @@ export default function Home() {
     const { data, error } = await supabase.from('rooms').select('*').eq('code',code).single()
     if (error||!data) { setError('Raum nicht gefunden.'); return }
     const existing = data.player_names || []
-    // Spectator ONLY if game is already playing AND room is full
-    if (data.status==='playing' && existing.length >= data.max_players) {
-      setRoomCode(code); setRoomId(data.id); setMyIdx(-1); setIsHost(false); setIsSpectator(true)
-      setGs(data.game_state); subscribeRoom(data.id); setScreen('game'); return
-    }
-    // Room full but not started
-    if (existing.length >= data.max_players) {
-      setError('Raum ist bereits voll.'); return
-    }
-    // Normal join
+    // Always allow joining — no spectator mode
     const newNames = [...existing, name]
     const idx = newNames.length - 1
     const updates = { player_names:newNames }
