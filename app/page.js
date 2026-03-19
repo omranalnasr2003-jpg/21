@@ -361,7 +361,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
   // ── Play pipeline ──────────────────────────────────────────────────────────
   // Safety: always unlock after max 4 seconds
   const safetyUnlock = useCallback(() => {
-    setTimeout(() => unlock(), 4000)
+    setTimeout(() => unlockedRef.current = true, 4000)
   }, [])
 
   const glow = useCallback((ids, delay, then) => {
@@ -371,7 +371,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setCollectingIds(ids)
       setTimeout(() => {
         setCollectingIds([])
-        unlock()
+        unlockedRef.current = true
         then()
       }, 420)
     }, delay)
@@ -379,8 +379,8 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
 
   const initiatePlay = useCallback((card) => {
     if (!isMyTurn) return
-    lock()
-    safetyUnlock()
+    lockedRef.current = true
+    safetyUnlockedRef.current = true
     const tw = [...table, card]
 
     if (isJack(card.rank)) {
@@ -389,7 +389,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setTimeout(() => {
         setLandingId(null)
         if (ids.length > 0) glow(ids, 800, () => onPlayCommit(card,[]))
-        else { unlock(); onPlayCommit(card,[]) }
+        else { unlockedRef.current = true; onPlayCommit(card,[]) }
       }, 280)
       return
     }
@@ -399,7 +399,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setTimeout(() => {
         setLandingId(null)
         if (other.length) glow([card.id,other[0].id], 800, () => onPlayCommit(card,[]))
-        else { unlock(); onPlayCommit(card,[]) }
+        else { unlockedRef.current = true; onPlayCommit(card,[]) }
       }, 280)
       return
     }
@@ -409,7 +409,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setTimeout(() => {
         setLandingId(null)
         if (other.length) glow([card.id,other[0].id], 800, () => onPlayCommit(card,[]))
-        else { unlock(); onPlayCommit(card,[]) }
+        else { unlockedRef.current = true; onPlayCommit(card,[]) }
       }, 280)
       return
     }
@@ -419,7 +419,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
     setTimeout(() => {
       setLandingId(null)
       if (!combos.length) {
-        unlock()
+        unlockedRef.current = true
         onPlayCommit(card,[])
         return
       }
@@ -428,14 +428,14 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
         return
       }
       setComboMenu({card,combos})
-      unlock()
+      unlockedRef.current = true
     }, 300)
   }, [isMyTurn, table, onPlayCommit, glow, safetyUnlock])
 
   const handlePick = useCallback((card, combo) => {
     setComboMenu(null)
-    lock()
-    safetyUnlock()
+    lockedRef.current = true
+    safetyUnlockedRef.current = true
     glow([card.id,...combo.map(c=>c.id)], 800, () => onPlayCommit(card,combo))
   }, [onPlayCommit, glow, safetyUnlock])
 
