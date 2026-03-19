@@ -355,6 +355,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
   }, [drag])
 
   // ── Play pipeline ──────────────────────────────────────────────────────────
+<<<<<<< HEAD
   // Safety: always unlock after max 4 seconds
   const safetyUnlock = useCallback(() => {
     setTimeout(() => setLocked(false), 4000)
@@ -371,22 +372,34 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
         then()
       }, 420)
     }, delay)
+=======
+  const glow = useCallback((ids, delay, then) => {
+    setHighlightIds(ids)
+    setTimeout(() => { setHighlightIds([]); setCollectingIds(ids); setTimeout(() => { setCollectingIds([]); then() }, 450) }, delay)
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
   }, [])
 
   const initiatePlay = useCallback((card) => {
     if (!isMyTurn) return
     setLocked(true)
+<<<<<<< HEAD
     safetyUnlock()
+=======
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
     const tw = [...table, card]
 
     if (isJack(card.rank)) {
       const ids = tw.filter(c=>c.rank!=='Q'&&c.rank!=='K').map(c=>c.id)
       setLandingId(card.id)
+<<<<<<< HEAD
       setTimeout(() => {
         setLandingId(null)
         if (ids.length > 0) glow(ids, 800, () => onPlayCommit(card,[]))
         else { setLocked(false); onPlayCommit(card,[]) }
       }, 280)
+=======
+      setTimeout(() => { setLandingId(null); glow(ids, 950, () => { onPlayCommit(card,[]) }) }, 320)
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
       return
     }
     if (card.rank==='Q') {
@@ -394,26 +407,39 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setLandingId(card.id)
       setTimeout(() => {
         setLandingId(null)
+<<<<<<< HEAD
         if (other.length) glow([card.id,other[0].id], 800, () => onPlayCommit(card,[]))
         else { setLocked(false); onPlayCommit(card,[]) }
       }, 280)
       return
+=======
+        if (other.length) glow([card.id,other[0].id], 900, () => { onPlayCommit(card,[]) })
+        else { onPlayCommit(card,[]) }
+      }, 320); return
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
     }
     if (card.rank==='K') {
       const other = tw.filter(c=>c.rank==='K'&&c.id!==card.id)
       setLandingId(card.id)
       setTimeout(() => {
         setLandingId(null)
+<<<<<<< HEAD
         if (other.length) glow([card.id,other[0].id], 800, () => onPlayCommit(card,[]))
         else { setLocked(false); onPlayCommit(card,[]) }
       }, 280)
       return
+=======
+        if (other.length) glow([card.id,other[0].id], 900, () => { onPlayCommit(card,[]) })
+        else { onPlayCommit(card,[]) }
+      }, 320); return
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
     }
 
     const combos = findCombosIncludingCard(card, tw)
     setLandingId(card.id)
     setTimeout(() => {
       setLandingId(null)
+<<<<<<< HEAD
       if (!combos.length) {
         setLocked(false)
         onPlayCommit(card,[])
@@ -434,6 +460,23 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
     safetyUnlock()
     glow([card.id,...combo.map(c=>c.id)], 800, () => onPlayCommit(card,combo))
   }, [onPlayCommit, glow, safetyUnlock])
+=======
+      if (!combos.length) { onPlayCommit(card,[]); return }
+      if (combos.length===1) {
+        const ids = [card.id,...combos[0].map(c=>c.id)]
+        glow(ids, 1000, () => { onPlayCommit(card,combos[0]) })
+        return
+      }
+      setComboMenu({card,combos}); setLocked(false)
+    }, 340)
+  }, [isMyTurn, table, myIdx, onPlayCommit, addLog, glow])
+
+  const handlePick = useCallback((card, combo) => {
+    setComboMenu(null); setLocked(true)
+    const ids = [card.id,...combo.map(c=>c.id)]
+    glow(ids, 900, () => { onPlayCommit(card,combo) })
+  }, [myIdx, onPlayCommit, addLog, glow])
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
 
   // Animate remote moves
   useEffect(() => {
@@ -447,6 +490,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
     }
   }, [gs.lastAction])
 
+<<<<<<< HEAD
   // Show card on table during landing animation
   const displayTable = (() => {
     let t = [...table]
@@ -457,6 +501,9 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
     }
     return t
   })()
+=======
+  const displayTable = comboMenu && !table.find(c=>c.id===comboMenu.card.id) ? [...table,comboMenu.card] : table
+>>>>>>> bd3f3832349c8de138c79364a3d4bc1dd3a28081
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
