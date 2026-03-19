@@ -317,13 +317,17 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
   const [landingId,     setLandingId]     = useState(null)
   const [highlightIds,  setHighlightIds]  = useState([])
   const [collectingIds, setCollectingIds] = useState([])
-  const [locked,        setLocked]        = useState(false)
   const [comboMenu,     setComboMenu]     = useState(null)
   const [showRules,     setShowRules]     = useState(false)
   const [moveLog,       setMoveLog]       = useState([])
 
+  // Use ref for locked — avoids stale closure issues and re-render problems
+  const lockedRef = useRef(false)
+  const lock   = () => { lockedRef.current = true }
+  const unlock = () => { lockedRef.current = false }
+
   const tableRef  = useRef(null)
-  const isMyTurn  = currentPlayer === myIdx && phase === 'playing' && !locked && !isSpectator
+  const isMyTurn  = currentPlayer === myIdx && phase === 'playing' && !lockedRef.currentRef.current && !isSpectator
 
   const addLog = useCallback((pi, card, took, jack, combo) => {
     setMoveLog(l => [...l.slice(-29), { pi, card:`${card.rank}${card.suit}`, took, jack:!!jack, combo:!!combo }])
@@ -357,7 +361,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
   // ── Play pipeline ──────────────────────────────────────────────────────────
   // Safety: always unlock after max 4 seconds
   const safetyUnlock = useCallback(() => {
-    setTimeout(() => setLocked(false), 4000)
+    setTimeout(() => unlock(), 4000)
   }, [])
 
   const glow = useCallback((ids, delay, then) => {
@@ -367,7 +371,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setCollectingIds(ids)
       setTimeout(() => {
         setCollectingIds([])
-        setLocked(false)
+        unlock()
         then()
       }, 420)
     }, delay)
@@ -375,7 +379,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
 
   const initiatePlay = useCallback((card) => {
     if (!isMyTurn) return
-    setLocked(true)
+    lock()
     safetyUnlock()
     const tw = [...table, card]
 
@@ -385,7 +389,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setTimeout(() => {
         setLandingId(null)
         if (ids.length > 0) glow(ids, 800, () => onPlayCommit(card,[]))
-        else { setLocked(false); onPlayCommit(card,[]) }
+        else { unlock(); onPlayCommit(card,[]) }
       }, 280)
       return
     }
@@ -395,7 +399,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setTimeout(() => {
         setLandingId(null)
         if (other.length) glow([card.id,other[0].id], 800, () => onPlayCommit(card,[]))
-        else { setLocked(false); onPlayCommit(card,[]) }
+        else { unlock(); onPlayCommit(card,[]) }
       }, 280)
       return
     }
@@ -405,7 +409,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       setTimeout(() => {
         setLandingId(null)
         if (other.length) glow([card.id,other[0].id], 800, () => onPlayCommit(card,[]))
-        else { setLocked(false); onPlayCommit(card,[]) }
+        else { unlock(); onPlayCommit(card,[]) }
       }, 280)
       return
     }
@@ -415,7 +419,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
     setTimeout(() => {
       setLandingId(null)
       if (!combos.length) {
-        setLocked(false)
+        unlock()
         onPlayCommit(card,[])
         return
       }
@@ -424,13 +428,13 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
         return
       }
       setComboMenu({card,combos})
-      setLocked(false)
+      unlock()
     }, 300)
   }, [isMyTurn, table, onPlayCommit, glow, safetyUnlock])
 
   const handlePick = useCallback((card, combo) => {
     setComboMenu(null)
-    setLocked(true)
+    lock()
     safetyUnlock()
     glow([card.id,...combo.map(c=>c.id)], 800, () => onPlayCommit(card,combo))
   }, [onPlayCommit, glow, safetyUnlock])
@@ -508,7 +512,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, isSpectator }) {
       <div ref={tableRef} style={{ width:'100%', maxWidth:560, background: drag?`rgba(30,138,94,.06)`:C.surface, borderRadius:14, padding:'10px 12px', marginBottom:6, border: drag?`1.5px dashed ${C.greenLt}`:`1px solid ${C.border}`, minHeight:130, position:'relative', transition:'border .2s, background .2s' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <span style={{ color:C.textMuted, fontSize:10, letterSpacing:3, fontFamily:"'Cinzel',serif" }}>TISCH</span>
-          {isMyTurn && !locked && <span style={{ color:C.textMuted, fontSize:9 }}>Karte anklicken oder hier ablegen</span>}
+          {isMyTurn && !lockedRef.current && <span style={{ color:C.textMuted, fontSize:9 }}>Karte anklicken oder hier ablegen</span>}
         </div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:7, minHeight:84, alignItems:'flex-start' }}>
           {displayTable.length===0 && <div style={{ color:C.textMuted, fontSize:13, margin:'auto', alignSelf:'center' }}>Kein Karten auf dem Tisch</div>}
