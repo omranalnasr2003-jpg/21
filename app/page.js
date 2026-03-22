@@ -242,7 +242,9 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
   const [fadeIds,       setFadeIds]       = useState([])
   const [comboMenu,     setComboMenu]     = useState(null)
   const [showRules,     setShowRules]     = useState(false)
+  const [opponentCard,  setOpponentCard]  = useState(null)  // opponent's last played card
   const playingRef = useRef(false)  // prevent double-plays
+  const lastActionRef = useRef(null) // track last seen action
 
   const canPlay = currentPlayer === myIdx && phase === 'playing' && !playingRef.current && !comboMenu
 
@@ -255,6 +257,34 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
       setFadeIds([])
     }
   }, [currentPlayer, myIdx])
+
+  // Show opponent's played card briefly
+  useEffect(() => {
+    const action = gs.lastAction
+    if (!action) return
+    if (action.playerIdx === myIdx) return
+    if (lastActionRef.current === action.timestamp) return
+    lastActionRef.current = action.timestamp
+    if (!action.card) return
+
+    // Show the card on table for 1.5 seconds
+    setOpponentCard(action.card)
+    if (action.removedIds?.length > 0) {
+      setTimeout(() => {
+        setGlowIds(action.removedIds)
+        setTimeout(() => {
+          setFadeIds(action.removedIds)
+          setGlowIds([])
+          setTimeout(() => {
+            setFadeIds([])
+            setOpponentCard(null)
+          }, 400)
+        }, 700)
+      }, 600)
+    } else {
+      setTimeout(() => setOpponentCard(null), 1500)
+    }
+  }, [gs.lastAction, myIdx])
 
   // ── Card click/tap ────────────────────────────────────────────────────────
   const handleCardClick = useCallback((card) => {
@@ -338,11 +368,12 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     }, 800)
   }, [onPlayCommit])
 
-  // Table to display: show pending card + current table
+  // Table to display: show pending + opponent + current table
   const displayTable = (() => {
     const t = [...table]
     if (pendingCard && !t.find(c => c.id === pendingCard.id)) t.push(pendingCard)
     if (comboMenu?.card && !t.find(c => c.id === comboMenu.card.id)) t.push(comboMenu.card)
+    if (opponentCard && !t.find(c => c.id === opponentCard.id)) t.push(opponentCard)
     return t
   })()
 
