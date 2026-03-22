@@ -258,7 +258,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     }
   }, [currentPlayer, myIdx])
 
-  // Show opponent's played card briefly
+  // Show opponent's played card briefly, then glow all affected cards, then fade together
   useEffect(() => {
     const action = gs.lastAction
     if (!action) return
@@ -267,22 +267,27 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     lastActionRef.current = action.timestamp
     if (!action.card) return
 
-    // Show the card on table for 1.5 seconds
+    // Step 1: show played card on table
     setOpponentCard(action.card)
+
     if (action.removedIds?.length > 0) {
+      // Step 2: after short pause, glow ALL removed cards (played + taken)
       setTimeout(() => {
         setGlowIds(action.removedIds)
+        // Step 3: after glow, fade them all out together
         setTimeout(() => {
           setFadeIds(action.removedIds)
           setGlowIds([])
+          // Step 4: cleanup
           setTimeout(() => {
             setFadeIds([])
             setOpponentCard(null)
-          }, 400)
-        }, 700)
-      }, 600)
+          }, 420)
+        }, 900)
+      }, 500)
     } else {
-      setTimeout(() => setOpponentCard(null), 1500)
+      // No combo — just show card on table briefly then leave it
+      setTimeout(() => setOpponentCard(null), 1200)
     }
   }, [gs.lastAction, myIdx])
 
