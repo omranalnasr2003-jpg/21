@@ -261,41 +261,39 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
 
   useEffect(() => { tableRef.current = table }, [table])
 
-  // When gs changes from opponent move, run animation using lastAction
   const lastActionTs = gs.lastAction?.timestamp
   const lastActionRef = useRef(null)
 
   useEffect(() => {
     if (!gs.lastAction) return
-    if (gs.lastAction.playerIdx === myIdx) return  // own move already animated
-    if (lastActionRef.current === lastActionTs) return  // already handled
+    if (gs.lastAction.playerIdx === myIdx) return
+    if (lastActionRef.current === lastActionTs) return
     lastActionRef.current = lastActionTs
 
-    const { card, removedIds } = gs.lastAction
+    const { card, removedIds, tableBeforePlay } = gs.lastAction
     if (!card) return
 
-    // Use the table state from BEFORE this gs update (stored in tableRef before setGs)
-    // Actually tableRef is already updated since gs changed
-    // So we reconstruct: current table + the played card
-    const beforeTable = [...table]
-    if (!beforeTable.find(c => c.id === card.id)) beforeTable.push(card)
+    // Use tableBeforePlay saved in lastAction — exact table state before the move
+    const beforeTable = tableBeforePlay
+      ? [...tableBeforePlay, card]  // old table + played card
+      : [...table, card]            // fallback
 
-    // Phase 1: show the card on table (it's already there from beforeTable reconstruction)
+    // Show the before-state immediately
     setPhase1Cards(beforeTable)
     setGlowIds([])
     setFadeIds([])
 
-    // Phase 2: glow all affected cards together
+    // Glow all affected cards
     setTimeout(() => {
       const toGlow = removedIds?.length > 0 ? removedIds : [card.id]
       setGlowIds(toGlow)
 
-      // Phase 3: fade all together
+      // Fade all together
       setTimeout(() => {
         setFadeIds(toGlow)
         setGlowIds([])
 
-        // Phase 4: clean up — show real table state
+        // Clean up
         setTimeout(() => {
           setPhase1Cards([])
           setFadeIds([])
