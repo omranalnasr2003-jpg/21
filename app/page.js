@@ -243,15 +243,17 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponent
   const { hands, table, collected, scores, currentPlayer, phase, playerNames, deck } = gs
   const n = playerNames.length
 
-  // Simple state — no complex locking
-  const [pendingCard,   setPendingCard]   = useState(null)  // card being played (visible on table)
+  // Animation state
+  const [pendingCard,   setPendingCard]   = useState(null)
   const [glowIds,       setGlowIds]       = useState([])
   const [fadeIds,       setFadeIds]       = useState([])
   const [comboMenu,     setComboMenu]     = useState(null)
   const [showRules,     setShowRules]     = useState(false)
-  const [opponentCard,  setOpponentCard]  = useState(null)  // opponent's last played card
-  const playingRef = useRef(false)  // prevent double-plays
-  const lastActionRef = useRef(null) // track last seen action
+  // For opponent animation: freeze the table at "before" state
+  const [frozenTable,   setFrozenTable]   = useState(null) // shows old table during anim
+  const [opponentCard,  setOpponentCard]  = useState(null) // opponent's played card overlay
+  const playingRef    = useRef(false)
+  const animatingRef  = useRef(false) // true while opponent animation plays
 
   const canPlay = currentPlayer === myIdx && phase === 'playing' && !playingRef.current && !comboMenu
 
@@ -265,28 +267,36 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponent
     }
   }, [currentPlayer, myIdx])
 
-  // Handle opponent animation — pendingOpponent comes BEFORE gs updates
+  // Opponent animation: freeze current table, show played card, glow, fade, then update
   useEffect(() => {
     if (!pendingOpponent) return
     const { card, removedIds, newGs } = pendingOpponent
+    if (animatingRef.current) return
+    animatingRef.current = true
 
-    // Step 1: show played card on table immediately
+    // Step 1: freeze current table (before-state) + show played card on top
+    setFrozenTable([...table, card])
     setOpponentCard(card)
 
-    // Step 2: after card lands, glow ALL cards together
+    // Step 2: immediately glow ALL affected cards (played card + table cards taken)
     setTimeout(() => {
       setGlowIds(removedIds)
+
       // Step 3: fade all together
       setTimeout(() => {
         setFadeIds(removedIds)
         setGlowIds([])
+
+        // Step 4: done — unfreeze and apply new state
         setTimeout(() => {
           setFadeIds([])
           setOpponentCard(null)
+          setFrozenTable(null)
+          animatingRef.current = false
           onOpponentAnimDone(newGs)
         }, 420)
-      }, 900)
-    }, 500)
+      }, 850)
+    }, 550)
   }, [pendingOpponent])
 
   // ── Card click/tap ────────────────────────────────────────────────────────
@@ -382,12 +392,14 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponent
     }, 900)
   }, [onPlayCommit])
 
-  // Table to display: show pending + opponent + current table
+  // Table to display:
+  // - During opponent animation: show frozenTable (before-state) 
+  // - During own play: show current table + pending card
   const displayTable = (() => {
+    if (frozenTable) return frozenTable  // frozen before-state during opponent anim
     const t = [...table]
     if (pendingCard && !t.find(c => c.id === pendingCard.id)) t.push(pendingCard)
     if (comboMenu?.card && !t.find(c => c.id === comboMenu.card.id)) t.push(comboMenu.card)
-    if (opponentCard && !t.find(c => c.id === opponentCard.id)) t.push(opponentCard)
     return t
   })()
 
