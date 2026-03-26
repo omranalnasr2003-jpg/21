@@ -248,7 +248,7 @@ function AnimCard({ card, glow, fade, landing, small, disabled, onClick }) {
 }
 
 // ─── GAME ─────────────────────────────────────────────────────────────────────
-function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
+function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingGs, onAnimDone }) {
   const { hands, table, collected, scores, currentPlayer, phase, playerNames, deck } = gs
 
   const [phase1Cards, setPhase1Cards] = useState([])  // cards shown on table before taking
@@ -261,24 +261,19 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
 
   useEffect(() => { tableRef.current = table }, [table])
 
-  const lastActionTs = gs.lastAction?.timestamp
-  const lastActionRef = useRef(null)
-
+  // When pendingGs arrives, animate BEFORE applying new state
   useEffect(() => {
-    if (!gs.lastAction) return
-    if (gs.lastAction.playerIdx === myIdx) return
-    if (lastActionRef.current === lastActionTs) return
-    lastActionRef.current = lastActionTs
+    if (!pendingGs) return
+    const action = pendingGs.lastAction
+    if (!action?.card) { onAnimDone(); return }
 
-    const { card, removedIds, tableBeforePlay } = gs.lastAction
-    if (!card) return
+    const { card, removedIds, tableBeforePlay } = action
 
-    // Use tableBeforePlay saved in lastAction — exact table state before the move
+    // Show old table + played card (state BEFORE the move)
     const beforeTable = tableBeforePlay
-      ? [...tableBeforePlay, card]  // old table + played card
-      : [...table, card]            // fallback
+      ? [...tableBeforePlay, card]
+      : [...table, card]
 
-    // Show the before-state immediately
     setPhase1Cards(beforeTable)
     setGlowIds([])
     setFadeIds([])
@@ -288,20 +283,19 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
       const toGlow = removedIds?.length > 0 ? removedIds : [card.id]
       setGlowIds(toGlow)
 
-      // Fade all together
       setTimeout(() => {
         setFadeIds(toGlow)
         setGlowIds([])
 
-        // Clean up
         setTimeout(() => {
           setPhase1Cards([])
           setFadeIds([])
+          onAnimDone()  // NOW apply new gs
         }, 400)
       }, 900)
     }, 500)
 
-  }, [lastActionTs])
+  }, [pendingGs])
 
   // Reset on my turn
   useEffect(() => {
@@ -520,6 +514,7 @@ export default function Home() {
   const [gs,setGs]=useState(null)
   const [waitingNames,setWaitingNames]=useState([])
   const [roundResult,setRoundResult]=useState(null)
+  const [pendingGs,setPendingGs]=useState(null)
   const channelRef=useRef(null)
   const gsRef=useRef(null)
   const myIdxRef=useRef(0)
@@ -543,8 +538,15 @@ export default function Home() {
         if(data.player_names) setWaitingNames(data.player_names)
         if(data.status==='playing'&&data.game_state){ setGs(data.game_state); setScreen('game'); return }
         if(data.game_state){
-          setGs(data.game_state)
-          if(data.game_state.phase==='roundover') doRoundResult(data.game_state)
+          const newGs = data.game_state
+          const action = newGs.lastAction
+          // If opponent played: hold new state, animate first, then apply
+          if(action && action.playerIdx !== myIdxRef.current && action.card) {
+            setPendingGs(newGs)
+          } else {
+            setGs(newGs)
+            if(newGs.phase==='roundover') doRoundResult(newGs)
+          }
         }
       }).subscribe()
   },[doRoundResult])
@@ -630,7 +632,7 @@ export default function Home() {
     <>
       {screen==='lobby'   &&<Lobby onCreateGame={handleCreate} onJoinGame={handleJoin} t={t} lang={lang} setLang={setLang}/>}
       {screen==='waiting' &&<WaitingRoom roomCode={roomCode} playerNames={waitingNames} myIdx={myIdx} onStart={handleStart} onLeave={handleLeave} t={t} isHost={isHost}/>}
-      {screen==='game'&&gs&&<Game gs={gs} myIdx={myIdx} onPlayCommit={handlePlayCommit} t={t} onLeave={handleLeave}/>}
+      {screen==='game'&&gs&&<Game gs={gs} myIdx={myIdx} onPlayCommit={handlePlayCommit} t={t} onLeave={handleLeave} pendingGs={pendingGs} onAnimDone={()=>{ if(pendingGs){ setGs(pendingGs); if(pendingGs.phase==='roundover') doRoundResult(pendingGs); setPendingGs(null) } }}/>}
       {roundResult&&<RoundResult result={roundResult.result} newScores={roundResult.newScores} collected={roundResult.collected} playerNames={roundResult.playerNames} t={t} onNext={handleNextRound} onRematch={handleRematch} gameOver={roundResult.winner21>=0} winner21={roundResult.winner21} maxScore={roundResult.maxScore||21}/>}
     </>
   )
