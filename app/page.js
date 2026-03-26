@@ -270,37 +270,43 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponent
     }
   }, [currentPlayer, myIdx])
 
-  // Opponent animation: freeze current table, show played card, glow, fade, then update
+  // Opponent animation: freeze table → card appears → glow all → fade all → update gs
   useEffect(() => {
     if (!pendingOpponent) return
     const { card, removedIds, newGs } = pendingOpponent
-    if (animatingRef.current) return
+    if (animatingRef.current) {
+      // Already animating — just apply state immediately
+      onOpponentAnimDone(newGs)
+      return
+    }
     animatingRef.current = true
 
-    // Step 1: freeze current table (before-state) using ref + show played card on top
-    const currentTable = tableRef.current || []
-    setFrozenTable([...currentTable, card])
-    setOpponentCard(card)
+    // Capture current table NOW (before any state updates)
+    const snapTable = [...(tableRef.current || [])]
 
-    // Step 2: immediately glow ALL affected cards (played card + table cards taken)
+    // Step 1: show frozen table + played card appears on top
+    const tableWithCard = card ? [...snapTable.filter(c => c.id !== card.id), card] : snapTable
+    setFrozenTable(tableWithCard)
+
+    // Step 2: glow all affected cards (played + taken from table)
+    const toGlow = removedIds.length > 0 ? removedIds : (card ? [card.id] : [])
     setTimeout(() => {
-      setGlowIds(removedIds)
+      setGlowIds(toGlow)
 
       // Step 3: fade all together
       setTimeout(() => {
-        setFadeIds(removedIds)
+        setFadeIds(toGlow)
         setGlowIds([])
 
-        // Step 4: done — unfreeze and apply new state
+        // Step 4: cleanup and apply new gs
         setTimeout(() => {
           setFadeIds([])
-          setOpponentCard(null)
           setFrozenTable(null)
           animatingRef.current = false
           onOpponentAnimDone(newGs)
-        }, 420)
-      }, 850)
-    }, 550)
+        }, 400)
+      }, 900)
+    }, 600)
   }, [pendingOpponent])
 
   // ── Card click/tap ────────────────────────────────────────────────────────
@@ -623,9 +629,9 @@ export default function Home() {
         if (data.game_state) {
           const newGs = data.game_state
           const action = newGs.lastAction
-          // If opponent played a card, animate first then update state
-          if (action && action.playerIdx !== myIdxRef.current && action.removedIds?.length > 0) {
-            setPendingOpponent({ card: action.card, removedIds: action.removedIds, newGs })
+          // Animate for opponent moves (not own moves - own animation already runs locally)
+          if (action && action.playerIdx !== myIdxRef.current) {
+            setPendingOpponent({ card: action.card, removedIds: action.removedIds || [], newGs })
           } else {
             setGs(newGs)
             if (newGs.phase === 'roundover') doRoundResult(newGs)
