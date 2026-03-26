@@ -90,6 +90,7 @@ function RulesModal({ onClose }) {
 function Lobby({ onCreateGame, onJoinGame, t, lang, setLang }) {
   const [tab,      setTab]      = useState('home')
   const [myName,   setMyName]   = useState('')
+  const [maxScore, setMaxScore] = useState(21)
   const [joinName, setJoinName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [err,      setErr]      = useState('')
@@ -122,12 +123,18 @@ function Lobby({ onCreateGame, onJoinGame, t, lang, setLang }) {
             <button onClick={() => setTab('home')} style={{ background:'transparent', border:'none', color:C.textSub, cursor:'pointer', fontSize:13, marginBottom:16, padding:0 }}>← {t.back}</button>
             <div style={{ color:C.textMuted, fontSize:11, letterSpacing:3, marginBottom:8, fontFamily:"'Cinzel',serif" }}>DEIN NAME</div>
             <Inp placeholder={t.enterName} value={myName} onChange={e => setMyName(e.target.value)}/>
-            <div style={{ color:C.textSub, fontSize:12, lineHeight:1.7, marginBottom:16, padding:'10px 12px', borderRadius:9, background:`rgba(212,168,67,.06)`, border:`1px solid rgba(212,168,67,.15)` }}>
-              Du erstellst einen Raum und bekommst einen Code.<br/>
-              Teile den Code mit Freunden — sie treten bei.<br/>
-              Du startest das Spiel wenn alle da sind.
+            <div style={{ color:C.textMuted, fontSize:11, letterSpacing:3, marginBottom:8, fontFamily:"'Cinzel',serif" }}>SPIELZIEL</div>
+            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+              {[11, 21].map(n => (
+                <button key={n} onClick={() => setMaxScore(n)} style={{
+                  flex:1, padding:'10px 0', borderRadius:9, fontSize:18, fontWeight:800, cursor:'pointer',
+                  border: maxScore===n ? `2px solid ${C.gold}` : `1px solid ${C.border}`,
+                  background: maxScore===n ? `rgba(212,168,67,.12)` : 'transparent',
+                  color: maxScore===n ? C.gold : C.textSub,
+                }}>{n} Pkt</button>
+              ))}
             </div>
-            <Btn onClick={() => { if(!myName.trim()){setErr('Bitte Namen eingeben');return}; onCreateGame(myName.trim()) }}>{t.startGame}</Btn>
+            <Btn onClick={() => { if(!myName.trim()){setErr('Bitte Namen eingeben');return}; onCreateGame(myName.trim(), maxScore) }}>{t.startGame}</Btn>
             {err && <div style={{ color:C.redLt, fontSize:12, marginTop:8 }}>{err}</div>}
           </>
         )}
@@ -267,27 +274,27 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     lastActionRef.current = action.timestamp
     if (!action.card) return
 
-    // Step 1: show played card on table
+    // Step 1: card appears on table
     setOpponentCard(action.card)
 
     if (action.removedIds?.length > 0) {
-      // Step 2: after short pause, glow ALL removed cards (played + taken)
+      // Step 2: wait so player can see the card land
       setTimeout(() => {
+        // Step 3: ALL cards (played + taken) glow green together
         setGlowIds(action.removedIds)
-        // Step 3: after glow, fade them all out together
         setTimeout(() => {
+          // Step 4: ALL cards fade out together
           setFadeIds(action.removedIds)
           setGlowIds([])
-          // Step 4: cleanup
           setTimeout(() => {
             setFadeIds([])
             setOpponentCard(null)
           }, 420)
         }, 900)
-      }, 500)
+      }, 600)
     } else {
-      // No combo — just show card on table briefly then leave it
-      setTimeout(() => setOpponentCard(null), 1200)
+      // No combo — card stays on table (already handled by gs update)
+      setTimeout(() => setOpponentCard(null), 800)
     }
   }, [gs.lastAction, myIdx])
 
@@ -302,16 +309,21 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     // Determine what happens
     if (isJack(card.rank)) {
       const toGlow = tableWith.filter(c => c.rank !== 'Q' && c.rank !== 'K').map(c => c.id)
-      setGlowIds(toGlow)
+      // Step 1: card lands on table (500ms)
       setTimeout(() => {
-        setFadeIds(toGlow)
-        setGlowIds([])
+        // Step 2: all affected cards glow together
+        setGlowIds(toGlow)
         setTimeout(() => {
-          setFadeIds([])
-          setPendingCard(null)
-          onPlayCommit(card, [])
-        }, 400)
-      }, 900)
+          // Step 3: all fade together
+          setFadeIds(toGlow)
+          setGlowIds([])
+          setTimeout(() => {
+            setFadeIds([])
+            setPendingCard(null)
+            onPlayCommit(card, [])
+          }, 420)
+        }, 900)
+      }, 500)
       return
     }
 
@@ -319,10 +331,12 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
       const other = tableWith.filter(c => c.rank === 'Q' && c.id !== card.id)
       if (other.length) {
         const ids = [card.id, other[0].id]
-        setGlowIds(ids)
-        setTimeout(() => { setFadeIds(ids); setGlowIds([]); setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, []) }, 400) }, 800)
+        setTimeout(() => {
+          setGlowIds(ids)
+          setTimeout(() => { setFadeIds(ids); setGlowIds([]); setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, []) }, 420) }, 900)
+        }, 500)
       } else {
-        setTimeout(() => { setPendingCard(null); onPlayCommit(card, []) }, 300)
+        setTimeout(() => { setPendingCard(null); onPlayCommit(card, []) }, 500)
       }
       return
     }
@@ -331,10 +345,12 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
       const other = tableWith.filter(c => c.rank === 'K' && c.id !== card.id)
       if (other.length) {
         const ids = [card.id, other[0].id]
-        setGlowIds(ids)
-        setTimeout(() => { setFadeIds(ids); setGlowIds([]); setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, []) }, 400) }, 800)
+        setTimeout(() => {
+          setGlowIds(ids)
+          setTimeout(() => { setFadeIds(ids); setGlowIds([]); setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, []) }, 420) }, 900)
+        }, 500)
       } else {
-        setTimeout(() => { setPendingCard(null); onPlayCommit(card, []) }, 300)
+        setTimeout(() => { setPendingCard(null); onPlayCommit(card, []) }, 500)
       }
       return
     }
@@ -349,11 +365,13 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
 
     if (combos.length === 1) {
       const ids = [card.id, ...combos[0].map(c => c.id)]
-      setGlowIds(ids)
       setTimeout(() => {
-        setFadeIds(ids); setGlowIds([])
-        setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, combos[0]) }, 400)
-      }, 900)
+        setGlowIds(ids)
+        setTimeout(() => {
+          setFadeIds(ids); setGlowIds([])
+          setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, combos[0]) }, 420)
+        }, 900)
+      }, 500)
       return
     }
 
@@ -369,8 +387,8 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     setGlowIds(ids)
     setTimeout(() => {
       setFadeIds(ids); setGlowIds([])
-      setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, combo) }, 400)
-    }, 800)
+      setTimeout(() => { setFadeIds([]); setPendingCard(null); onPlayCommit(card, combo) }, 420)
+    }, 900)
   }, [onPlayCommit])
 
   // Table to display: show pending + opponent + current table
@@ -392,7 +410,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
             background: i===currentPlayer ? `rgba(212,168,67,.12)` : `rgba(20,35,55,.8)`,
             border: i===currentPlayer ? `1.5px solid ${C.gold}` : `1px solid ${C.border}`, transition:'all .3s' }}>
             <div style={{ color:C.textMuted, fontSize:9, letterSpacing:1, fontFamily:"'Cinzel',serif", overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
-            <div style={{ color:C.gold, fontSize:22, fontWeight:900, lineHeight:1, fontFamily:"'Cinzel',serif" }}>{scores[i]}</div>
+            <div style={{ color:C.gold, fontSize:22, fontWeight:900, lineHeight:1, fontFamily:"'Cinzel',serif" }}>{scores[i]}<span style={{ color:C.textMuted, fontSize:9 }}>/{gs.maxScore||21}</span></div>
             {i===myIdx && <div style={{ color:C.greenLt, fontSize:8, letterSpacing:1 }}>DU</div>}
           </div>
         ))}
@@ -496,7 +514,7 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
 }
 
 // ─── ROUND RESULT ─────────────────────────────────────────────────────────────
-function RoundResult({ result, newScores, collected, playerNames, t, onNext, onRematch, gameOver, winner21 }) {
+function RoundResult({ result, newScores, collected, playerNames, t, onNext, onRematch, gameOver, winner21, maxScore }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.9)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:16 }}>
       <div style={{ background:C.surface, borderRadius:22, padding:'28px 26px', border:`1.5px solid ${C.gold}`, maxWidth:440, width:'100%' }}>
@@ -528,7 +546,7 @@ function RoundResult({ result, newScores, collected, playerNames, t, onNext, onR
           {playerNames.map((name, i) => (
             <div key={i} style={{ textAlign:'center' }}>
               <div style={{ color:C.textMuted, fontSize:9, fontFamily:"'Cinzel',serif" }}>{name}</div>
-              <div style={{ color:C.text, fontSize:20, fontWeight:700, fontFamily:"'Cinzel',serif" }}>{newScores[i]}<span style={{ color:C.textMuted, fontSize:11 }}>/21</span></div>
+              <div style={{ color:C.text, fontSize:20, fontWeight:700, fontFamily:"'Cinzel',serif" }}>{newScores[i]}<span style={{ color:C.textMuted, fontSize:11 }}>/{maxScore||21}</span></div>
             </div>
           ))}
         </div>
@@ -566,6 +584,7 @@ export default function Home() {
   const [gs,           setGs]           = useState(null)
   const [waitingNames, setWaitingNames] = useState([])
   const [roundResult,  setRoundResult]  = useState(null)
+  const [roomMaxScore, setRoomMaxScore] = useState(21)
   const channelRef = useRef(null)
   const gsRef      = useRef(null)
 
@@ -574,9 +593,10 @@ export default function Home() {
   const doRoundResult = useCallback((newGs) => {
     const result    = calcRoundPts(newGs.collected, newGs.teamMode, newGs.playerNames.length)
     const newScores = newGs.scores.map((s, i) => s + result.pts[i])
-    const winner21  = newScores.findIndex(s => s >= 21)
+    const maxScore  = newGs.maxScore || 21
+    const winner21  = newScores.findIndex(s => s >= maxScore)
     result.lastCollector = newGs.lastCollector ?? null
-    setRoundResult({ result, newScores, collected: newGs.collected, playerNames: newGs.playerNames, winner21 })
+    setRoundResult({ result, newScores, collected: newGs.collected, playerNames: newGs.playerNames, winner21, maxScore })
   }, [])
 
   const subscribeRoom = useCallback((rId) => {
@@ -597,15 +617,16 @@ export default function Home() {
   }, [doRoundResult])
 
   // ── Create ────────────────────────────────────────────────────────────────
-  const handleCreate = async (hostName) => {
+  const handleCreate = async (hostName, maxScore = 21) => {
     const code = genCode()
     const { data, error } = await supabase.from('rooms').insert({
       code, host_name: hostName, player_names: [hostName],
       max_players: 4, game_state: null, status: 'waiting',
+      max_score: maxScore,
     }).select().single()
     if (error || !data) { alert('Fehler: ' + (error?.message || '')); return }
     setRoomCode(code); setRoomId(data.id); setMyIdx(0); setIsHost(true)
-    setWaitingNames([hostName])
+    setWaitingNames([hostName]); setRoomMaxScore(maxScore)
     subscribeRoom(data.id)
     setScreen('waiting')
   }
@@ -633,7 +654,8 @@ export default function Home() {
     const { data } = await supabase.from('rooms').select('*').eq('id', roomId).single()
     const names = data.player_names || []
     if (names.length < 2) { alert('Mindestens 2 Spieler benötigt.'); return }
-    const newGs = initGameState(names, false)
+    const maxScore = data.max_score || roomMaxScore || 21
+    const newGs = { ...initGameState(names, false), maxScore }
     await supabase.from('rooms').update({ game_state: newGs, status: 'playing', max_players: names.length }).eq('id', roomId)
     setGs(newGs); setScreen('game')
   }
@@ -707,6 +729,7 @@ export default function Home() {
           collected={roundResult.collected} playerNames={roundResult.playerNames}
           t={t} onNext={handleNextRound} onRematch={handleRematch}
           gameOver={roundResult.winner21 >= 0} winner21={roundResult.winner21}
+          maxScore={roundResult.maxScore || 21}
         />
       )}
     </>
