@@ -628,14 +628,22 @@ export default function Home() {
         }
         if (data.game_state) {
           const newGs = data.game_state
-          const action = newGs.lastAction
-          // Animate for opponent moves (not own moves - own animation already runs locally)
-          if (action && action.playerIdx !== myIdxRef.current) {
-            setPendingOpponent({ card: action.card, removedIds: action.removedIds || [], newGs })
-          } else {
-            setGs(newGs)
-            if (newGs.phase === 'roundover') doRoundResult(newGs)
+
+          // Check if this is an animation broadcast (pendingAnim = in-between state)
+          if (newGs.pendingAnim) {
+            const anim = newGs.pendingAnim
+            // Show animation for ALL players (including the one who played)
+            setPendingOpponent({
+              card: anim.card,
+              removedIds: anim.removedIds || [],
+              newGs: null, // real state comes in next update
+            })
+            return
           }
+
+          // Real state update — just apply it
+          setGs(newGs)
+          if (newGs.phase === 'roundover') doRoundResult(newGs)
         }
       }).subscribe()
   }, [doRoundResult])
@@ -689,9 +697,25 @@ export default function Home() {
     const cur = gsRef.current
     if (!cur || cur.currentPlayer !== myIdx) return
     const newGs = applyPlayCard(cur, myIdx, card, comboCards)
-    setGs(newGs)
-    await supabase.from('rooms').update({ game_state: newGs }).eq('id', roomId)
-    if (newGs.phase === 'roundover') doRoundResult(newGs)
+
+    // Step 1: broadcast ONLY the animation info — both players see this instantly
+    const animGs = {
+      ...cur,
+      pendingAnim: {
+        card,
+        removedIds: newGs.lastAction?.removedIds || [],
+        playerIdx: myIdx,
+        timestamp: Date.now(),
+      }
+    }
+    await supabase.from('rooms').update({ game_state: animGs }).eq('id', roomId)
+
+    // Step 2: after animation plays (~1.9s), write the real new state
+    setTimeout(async () => {
+      setGs(newGs)
+      await supabase.from('rooms').update({ game_state: newGs }).eq('id', roomId)
+      if (newGs.phase === 'roundover') doRoundResult(newGs)
+    }, 1900)
   }, [myIdx, roomId, doRoundResult])
 
   // ── Next round ────────────────────────────────────────────────────────────
@@ -745,7 +769,7 @@ export default function Home() {
     <>
       {screen === 'lobby'   && <Lobby onCreateGame={handleCreate} onJoinGame={handleJoin} t={t} lang={lang} setLang={setLang}/>}
       {screen === 'waiting' && <WaitingRoom roomCode={roomCode} playerNames={waitingNames} myIdx={myIdx} onStart={handleStart} onLeave={handleLeave} t={t} isHost={isHost}/>}
-      {screen === 'game' && gs && <Game gs={gs} myIdx={myIdx} onPlayCommit={handlePlayCommit} t={t} onLeave={handleLeave} pendingOpponent={pendingOpponent} onOpponentAnimDone={(newGs) => { setPendingOpponent(null); setGs(newGs); if(newGs.phase==='roundover') doRoundResult(newGs) }}/>}
+      {screen === 'game' && gs && <Game gs={gs} myIdx={myIdx} onPlayCommit={handlePlayCommit} t={t} onLeave={handleLeave} pendingOpponent={pendingOpponent} onOpponentAnimDone={(newGs) => { setPendingOpponent(null); if(newGs) { setGs(newGs); if(newGs.phase==='roundover') doRoundResult(newGs) } }}/>}
       {roundResult && (
         <RoundResult
           result={roundResult.result} newScores={roundResult.newScores}
