@@ -239,7 +239,7 @@ function ComboPicker({ playedCard, combos, onPick, onSkip }) {
 }
 
 // ─── GAME ─────────────────────────────────────────────────────────────────────
-function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
+function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponentAnimDone }) {
   const { hands, table, collected, scores, currentPlayer, phase, playerNames, deck } = gs
   const n = playerNames.length
 
@@ -265,38 +265,29 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave }) {
     }
   }, [currentPlayer, myIdx])
 
-  // Show opponent's played card briefly, then glow all affected cards, then fade together
+  // Handle opponent animation — pendingOpponent comes BEFORE gs updates
   useEffect(() => {
-    const action = gs.lastAction
-    if (!action) return
-    if (action.playerIdx === myIdx) return
-    if (lastActionRef.current === action.timestamp) return
-    lastActionRef.current = action.timestamp
-    if (!action.card) return
+    if (!pendingOpponent) return
+    const { card, removedIds, newGs } = pendingOpponent
 
-    // Step 1: card appears on table
-    setOpponentCard(action.card)
+    // Step 1: show played card on table immediately
+    setOpponentCard(card)
 
-    if (action.removedIds?.length > 0) {
-      // Step 2: wait so player can see the card land
+    // Step 2: after card lands, glow ALL cards together
+    setTimeout(() => {
+      setGlowIds(removedIds)
+      // Step 3: fade all together
       setTimeout(() => {
-        // Step 3: ALL cards (played + taken) glow green together
-        setGlowIds(action.removedIds)
+        setFadeIds(removedIds)
+        setGlowIds([])
         setTimeout(() => {
-          // Step 4: ALL cards fade out together
-          setFadeIds(action.removedIds)
-          setGlowIds([])
-          setTimeout(() => {
-            setFadeIds([])
-            setOpponentCard(null)
-          }, 420)
-        }, 900)
-      }, 600)
-    } else {
-      // No combo — card stays on table (already handled by gs update)
-      setTimeout(() => setOpponentCard(null), 800)
-    }
-  }, [gs.lastAction, myIdx])
+          setFadeIds([])
+          setOpponentCard(null)
+          onOpponentAnimDone(newGs)
+        }, 420)
+      }, 900)
+    }, 500)
+  }, [pendingOpponent])
 
   // ── Card click/tap ────────────────────────────────────────────────────────
   const handleCardClick = useCallback((card) => {
@@ -585,10 +576,13 @@ export default function Home() {
   const [waitingNames, setWaitingNames] = useState([])
   const [roundResult,  setRoundResult]  = useState(null)
   const [roomMaxScore, setRoomMaxScore] = useState(21)
-  const channelRef = useRef(null)
-  const gsRef      = useRef(null)
+  const channelRef  = useRef(null)
+  const gsRef       = useRef(null)
+  const myIdxRef    = useRef(0)
+  const [pendingOpponent, setPendingOpponent] = useState(null)
 
   useEffect(() => { gsRef.current = gs }, [gs])
+  useEffect(() => { myIdxRef.current = myIdx }, [myIdx])
 
   const doRoundResult = useCallback((newGs) => {
     const result    = calcRoundPts(newGs.collected, newGs.teamMode, newGs.playerNames.length)
@@ -605,13 +599,21 @@ export default function Home() {
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'rooms', filter:`id=eq.${rId}` }, payload => {
         const data = payload.new
         if (data.player_names) setWaitingNames(data.player_names)
-        if (data.game_state) {
-          setGs(data.game_state)
-          if (data.game_state.phase === 'roundover') doRoundResult(data.game_state)
-        }
         if (data.status === 'playing' && data.game_state) {
           setGs(data.game_state)
           setScreen('game')
+          return
+        }
+        if (data.game_state) {
+          const newGs = data.game_state
+          const action = newGs.lastAction
+          // If opponent played a card, animate first then update state
+          if (action && action.playerIdx !== myIdxRef.current && action.removedIds?.length > 0) {
+            setPendingOpponent({ card: action.card, removedIds: action.removedIds, newGs })
+          } else {
+            setGs(newGs)
+            if (newGs.phase === 'roundover') doRoundResult(newGs)
+          }
         }
       }).subscribe()
   }, [doRoundResult])
@@ -719,10 +721,9 @@ export default function Home() {
 
   return (
     <>
-      <LangBar lang={lang} setLang={setLang}/>
       {screen === 'lobby'   && <Lobby onCreateGame={handleCreate} onJoinGame={handleJoin} t={t} lang={lang} setLang={setLang}/>}
       {screen === 'waiting' && <WaitingRoom roomCode={roomCode} playerNames={waitingNames} myIdx={myIdx} onStart={handleStart} onLeave={handleLeave} t={t} isHost={isHost}/>}
-      {screen === 'game' && gs && <Game gs={gs} myIdx={myIdx} onPlayCommit={handlePlayCommit} t={t} onLeave={handleLeave}/>}
+      {screen === 'game' && gs && <Game gs={gs} myIdx={myIdx} onPlayCommit={handlePlayCommit} t={t} onLeave={handleLeave} pendingOpponent={pendingOpponent} onOpponentAnimDone={(newGs) => { setPendingOpponent(null); setGs(newGs); if(newGs.phase==='roundover') doRoundResult(newGs) }}/>}
       {roundResult && (
         <RoundResult
           result={roundResult.result} newScores={roundResult.newScores}
