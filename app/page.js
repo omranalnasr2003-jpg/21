@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { LANG } from '../lib/i18n'
-import { CardFace, CardBack } from '../components/Card'
 import { isJack, findCombosIncludingCard, initGameState, applyPlayCard, calcRoundPts } from '../lib/gameLogic'
 
 const C = {
