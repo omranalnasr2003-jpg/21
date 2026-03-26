@@ -249,13 +249,16 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponent
   const [fadeIds,       setFadeIds]       = useState([])
   const [comboMenu,     setComboMenu]     = useState(null)
   const [showRules,     setShowRules]     = useState(false)
-  // For opponent animation: freeze the table at "before" state
-  const [frozenTable,   setFrozenTable]   = useState(null) // shows old table during anim
-  const [opponentCard,  setOpponentCard]  = useState(null) // opponent's played card overlay
+  const [frozenTable,   setFrozenTable]   = useState(null)
+  const [opponentCard,  setOpponentCard]  = useState(null)
   const playingRef    = useRef(false)
-  const animatingRef  = useRef(false) // true while opponent animation plays
+  const animatingRef  = useRef(false)
+  const tableRef      = useRef(table) // always current table
 
   const canPlay = currentPlayer === myIdx && phase === 'playing' && !playingRef.current && !comboMenu
+
+  // Keep tableRef current
+  useEffect(() => { tableRef.current = table }, [table])
 
   // Reset when it becomes my turn again
   useEffect(() => {
@@ -274,8 +277,9 @@ function Game({ gs, myIdx, onPlayCommit, t, onLeave, pendingOpponent, onOpponent
     if (animatingRef.current) return
     animatingRef.current = true
 
-    // Step 1: freeze current table (before-state) + show played card on top
-    setFrozenTable([...table, card])
+    // Step 1: freeze current table (before-state) using ref + show played card on top
+    const currentTable = tableRef.current || []
+    setFrozenTable([...currentTable, card])
     setOpponentCard(card)
 
     // Step 2: immediately glow ALL affected cards (played card + table cards taken)
